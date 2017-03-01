@@ -1,6 +1,4 @@
-var child_process = require('child_process');
 var path = require('path');
-var os = require('os');
 var ffi = require('ffi');
 var ref = require('ref');
 var struct = require('ref-struct');
@@ -119,6 +117,7 @@ module.exports = function(target) {
 	return new Promise((resolve, reject) => {
 		target = path.resolve(target);
 
+		// Load icon data
 		var iconIndex = ref.alloc(ref.types.int32, 0);
 		var info = new iconInfo();
 
@@ -127,9 +126,11 @@ module.exports = function(target) {
 			throw new Error("Failed to load icon info.");
 		}
 
+		// Load icon bitmaps
 		var colored = loadBitmap(info.hbmColor);
 		var mask = loadBitmap(info.hbmMask);
 
+		// Load bitmaps into standardized formats
 		var colored_bmp = bmp_js.decode(colored.data);
 		var mask_bmp = bmp_js.decode(mask.data);
 
@@ -139,6 +140,7 @@ module.exports = function(target) {
 		jimp.read(bmp_js.encode(colored_bmp).data, (err, colored_img) => {
 			if (err) return reject(err);
 
+			// Bitmap can have 32 bits per color, but ignore the aplha channel
 			var has_alpha = false;
 
 			// 32 bit BMP can have alpha encoded, so we may not need the mask
