@@ -1,14 +1,22 @@
 {
   "name": "win-icon-extractor",
-  "version": "1.0.1",
-  "description": "",
+  "version": "1.0.2",
+  "description": "Extracts icon resource from any windows binary or file to base64 PNG string.",
   "main": "index.js",
   "scripts": {},
-  "repository": {},
-  "keywords": [],
-  "author": "",
+  "repository": {
+      "type" : "git",
+      "url" : "https://github.com/SkaceKamen/win-icon-extractor.git"
+  },
+  "keywords": [
+    "windows",
+    "icon extractor"
+  ],
+  "author": "Jan Zipek",
   "license": "MIT",
-  "bugs": {},
+  "bugs": {
+    "url": "https://github.com/SkaceKamen/win-icon-extractor/issues"
+  },
   "dependencies": {
     "bmp-js": "0.0.3",
     "ffi": "2",
