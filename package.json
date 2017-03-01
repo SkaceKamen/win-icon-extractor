@@ -1,6 +1,6 @@
 {
   "name": "win-icon-extractor",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Extracts icon resource from any windows binary or file to base64 PNG string.",
   "main": "index.js",
   "scripts": {},

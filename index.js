@@ -172,7 +172,6 @@ module.exports = function(target) {
 					if (err) return reject(err);
 					
 					var masked_img = colored_img.mask(mask_img.invert(), 0, 0);
-					masked_img.write("icon.png");
 					masked_img.getBase64(jimp.MIME_PNG, (error, base64) => {
 						if (err) return reject(err);
 						
