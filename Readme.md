@@ -4,6 +4,7 @@ This module attempts to extract icons of any windows resource and returns PNG re
 
 ## Limitations
 
+ - only runs on windows (uses internal windows libraries)
  - the result has always 32x32
  - only ASCII paths accepted
 
