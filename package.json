@@ -4,6 +4,7 @@
   "description": "Extracts icon resource from any windows binary or file to base64 PNG string.",
   "main": "index.js",
   "scripts": {},
+  "os" : [ "win32" ],
   "repository": {
       "type" : "git",
       "url" : "https://github.com/SkaceKamen/win-icon-extractor.git"
