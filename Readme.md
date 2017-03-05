@@ -1,11 +1,11 @@
 # Windows Icon Extractor
 
-This module attempts to extract icons of any windows resource and returns PNG represented by base64 string.
+This module attempts to extract icons of any windows path and returns PNG represented by base64 string.
 
 ## Limitations
 
  - only runs on windows (uses internal windows libraries)
- - the result has always 32x32
+ - the result is always 32x32
  - only ASCII paths accepted
 
 ## Installation
