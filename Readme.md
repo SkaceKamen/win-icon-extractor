@@ -6,7 +6,14 @@ This module attempts to extract icons of any windows path and returns PNG repres
 
  - only runs on windows (uses internal windows libraries)
  - the result is always 32x32
- - only ASCII paths accepted
+
+## Changelog
+### 1.0.4
+
+ - Unicode paths accepted now!
+ - Fixed loader failing to load icon on random (caused by wrong memory management)
+ - Fixed possible memory leak
+
 
 ## Installation
 
