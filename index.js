@@ -82,16 +82,23 @@ var user32 = ffi.Library('user32', {
 	'DestroyIcon': ['bool', [HANDLE]]
 });
 
-function loadBitmap(hbitmap) {
+function loadBitmap(hbitmap, ident) {
 	var bitmap = new bitmapInfo();
 	
+	// Clear bitmap info
+	bitmap['ref.buffer'].fill(0);
+
 	// Save the bmiheader size
 	bitmap.bmiHeader.biSize = 40;
 
 	// Load bitmap details
 	var dc = user32.GetDC(null);
+	if (dc.deref() == 0) {
+		throw new Error("Failed to get screen DC.");
+	}
+	
 	if (gdi32.GetDIBits(dc, hbitmap, 0, 0, null, bitmap.ref(), 0) == 0) {
-		throw new Error("Failed to load BITMAP info.");
+		throw new Error("Failed to load BITMAP (" + ident + ") info.");
 	}
 
 	// Slice off the unused color table
@@ -135,6 +142,9 @@ module.exports = function(target) {
 		// Load icon data
 		var iconIndex = ref.alloc(ref.types.int32, 0);
 		var info = new iconInfo();
+		
+		// Clear info struct
+		info['ref.buffer'].fill(0);
 
 		var result = shell32.ExtractAssociatedIconW(null, target, iconIndex);
 		if (!user32.GetIconInfo(result, info.ref())) {
@@ -142,8 +152,8 @@ module.exports = function(target) {
 		}
 		
 		// Load icon bitmaps
-		var colored = loadBitmap(info.hbmColor);
-		var mask = loadBitmap(info.hbmMask);
+		var colored = loadBitmap(info.hbmColor, 'colored');
+		var mask = loadBitmap(info.hbmMask, 'mask');
 
 		// Remove icon from memory
 		user32.DestroyIcon(result);
