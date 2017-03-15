@@ -10,24 +10,24 @@ var IntPtr = ref.refType(ref.types.int);
 var HANDLE = ref.refType(ref.types.void);
 
 var lpctstr = {
-    name: 'lpctstr',
-    indirection: 1,
-    size: ref.sizeof.pointer,
-    get: function(buffer, offset) {
-        var _buf = buffer.readPointer(offset);
-        if(_buf.isNull()) {
-            return null;
-        }
-        return _buf.readCString(0);
-    },
-    set: function(buffer, offset, value) {
+	name: 'lpctstr',
+	indirection: 1,
+	size: ref.sizeof.pointer,
+	get: function(buffer, offset) {
+		var _buf = buffer.readPointer(offset);
+		if(_buf.isNull()) {
+			return null;
+		}
+		return _buf.readCString(0);
+	},
+	set: function(buffer, offset, value) {
 		var _buf = new Buffer(Buffer.byteLength(value, 'ucs2') + 2)
 		_buf.write(value, 'ucs2')
 		_buf[_buf.length - 2] = 0
 		_buf[_buf.length - 1] = 0
 		return buffer.writePointer(_buf, offset)
-    },
-    ffi_type: ffi.types.CString.ffi_type
+	},
+	ffi_type: ffi.types.CString.ffi_type
 };
 
 var iconInfo = struct({
