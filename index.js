@@ -6,12 +6,6 @@ var fs = require('fs');
 var jimp = require('jimp');
 var bmp_js = require('bmp-js');
 
-function checkSupport() {
-	if (process.platform != 'win32') {
-		throw new Error("Only windows is supported.");
-	}
-}
-
 var IntPtr = ref.refType(ref.types.int);
 var HANDLE = ref.refType(ref.types.void);
 
@@ -63,7 +57,8 @@ var gdi32 = ffi.Library('gdi32', {
 });
 var user32 = ffi.Library('user32', {
 	'GetIconInfo': ['bool', [IntPtr, ref.refType(iconInfo)]],
-	'GetDC': [HANDLE, [IntPtr]]
+	'GetDC': [HANDLE, [IntPtr]],
+	'DestroyIcon': ['bool', [HANDLE]]
 });
 
 function loadBitmap(hbitmap) {
@@ -112,8 +107,6 @@ function loadBitmap(hbitmap) {
 }
 
 module.exports = function(target) {
-	checkSupport();
-
 	return new Promise((resolve, reject) => {
 		target = path.resolve(target);
 
@@ -125,10 +118,13 @@ module.exports = function(target) {
 		if (!user32.GetIconInfo(result, info.ref())) {
 			throw new Error("Failed to load icon info.");
 		}
-
+		
 		// Load icon bitmaps
 		var colored = loadBitmap(info.hbmColor);
 		var mask = loadBitmap(info.hbmMask);
+
+		// Remove icon from memory
+		user32.DestroyIcon(result);
 
 		// Load bitmaps into standardized formats
 		var colored_bmp = bmp_js.decode(colored.data);
