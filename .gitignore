@@ -1,5 +1,1 @@
-bin/
-*.exe
-tmp/
-test.js
 node_modules/
