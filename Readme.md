@@ -11,7 +11,7 @@ This module attempts to extract icons of any windows path and returns PNG repres
 ### 1.0.4
 
  - Unicode paths accepted now!
- - Fixed loader failing to load icon on random (caused by wrong memory management)
+ - Fixed occasional failture to load icon (caused by wrong memory management)
  - Fixed possible memory leak
 
 
