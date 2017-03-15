@@ -9,6 +9,27 @@ var bmp_js = require('bmp-js');
 var IntPtr = ref.refType(ref.types.int);
 var HANDLE = ref.refType(ref.types.void);
 
+var lpctstr = {
+    name: 'lpctstr',
+    indirection: 1,
+    size: ref.sizeof.pointer,
+    get: function(buffer, offset) {
+        var _buf = buffer.readPointer(offset);
+        if(_buf.isNull()) {
+            return null;
+        }
+        return _buf.readCString(0);
+    },
+    set: function(buffer, offset, value) {
+		var _buf = new Buffer(Buffer.byteLength(value, 'ucs2') + 2)
+		_buf.write(value, 'ucs2')
+		_buf[_buf.length - 2] = 0
+		_buf[_buf.length - 1] = 0
+		return buffer.writePointer(_buf, offset)
+    },
+    ffi_type: ffi.types.CString.ffi_type
+};
+
 var iconInfo = struct({
 	'fIcon': ref.types.bool,
 	'xHotspot': ref.types.ulong,
@@ -50,7 +71,7 @@ for (var i = 0; i < 16; i++) {
 }
 
 var shell32 = ffi.Library('shell32', {
-	'ExtractAssociatedIconA': ["void *", [IntPtr, 'string', IntPtr]]
+	'ExtractAssociatedIconW': ["void *", [IntPtr, lpctstr, IntPtr]]
 });
 var gdi32 = ffi.Library('gdi32', {
 	'GetDIBits': [ref.types.int32, [IntPtr, IntPtr, 'uint32', 'uint32', IntPtr, ref.refType(bitmapInfo), 'uint32'] ]
@@ -108,13 +129,14 @@ function loadBitmap(hbitmap) {
 
 module.exports = function(target) {
 	return new Promise((resolve, reject) => {
+		// Make sure the path is absolute
 		target = path.resolve(target);
 
 		// Load icon data
 		var iconIndex = ref.alloc(ref.types.int32, 0);
 		var info = new iconInfo();
 
-		var result = shell32.ExtractAssociatedIconA(null, target, iconIndex);
+		var result = shell32.ExtractAssociatedIconW(null, target, iconIndex);
 		if (!user32.GetIconInfo(result, info.ref())) {
 			throw new Error("Failed to load icon info.");
 		}
