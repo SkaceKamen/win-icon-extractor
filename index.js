@@ -21,7 +21,7 @@ var lpctstr = {
 		return _buf.readCString(0);
 	},
 	set: function(buffer, offset, value) {
-		var _buf = new Buffer(Buffer.byteLength(value, 'ucs2') + 2)
+        var _buf = Buffer.alloc(Buffer.byteLength(value, 'ucs2') + 2)
 		_buf.write(value, 'ucs2')
 		_buf[_buf.length - 2] = 0
 		_buf[_buf.length - 1] = 0
@@ -109,13 +109,13 @@ function loadBitmap(hbitmap, ident) {
 	bitmap.bmiHeader.biCompression = 0;
 
 	// Load bitmap data
-	var data = new Buffer(bitmap.bmiHeader.biSizeImage);
+    var data = Buffer.alloc(bitmap.bmiHeader.biSizeImage);
 	if (gdi32.GetDIBits(dc, hbitmap, 0, bitmap.bmiHeader.biHeight, data, bitmap.ref(), 0) == 0) {
 		throw new Error("Failed to load BITMAP data.");
 	}
 
 	// Prepare BMP header
-	var header = new Buffer(2 + 4 + 4 + 4);
+    var header = Buffer.alloc(2 + 4 + 4 + 4);
 	
 	// BMP signature (BM)
 	header.writeUInt8(66, 0);
