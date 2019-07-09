@@ -1,212 +1,190 @@
-var path = require('path');
-var ffi = require('ffi');
-var ref = require('ref');
-var struct = require('ref-struct');
-var fs = require('fs');
-var jimp = require('jimp');
-var bmp_js = require('bmp-js');
+// koffee 0.56.0
+var HANDLE, IntPtr, bitmapInfo, bitmapInfoHeader, bmp_js, ffi, fs, gdi32, i, iconInfo, j, jimp, loadBitmap, lpctstr, palleteColor, path, ref, shell32, struct, user32;
 
-var IntPtr = ref.refType(ref.types.int);
-var HANDLE = ref.refType(ref.types.void);
+path = require('path');
 
-var lpctstr = {
-	name: 'lpctstr',
-	indirection: 1,
-	size: ref.sizeof.pointer,
-	get: function(buffer, offset) {
-		var _buf = buffer.readPointer(offset);
-		if(_buf.isNull()) {
-			return null;
-		}
-		return _buf.readCString(0);
-	},
-	set: function(buffer, offset, value) {
-        var _buf = Buffer.alloc(Buffer.byteLength(value, 'ucs2') + 2)
-		_buf.write(value, 'ucs2')
-		_buf[_buf.length - 2] = 0
-		_buf[_buf.length - 1] = 0
-		return buffer.writePointer(_buf, offset)
-	},
-	ffi_type: ffi.types.CString.ffi_type
+ffi = require('ffi-napi');
+
+ref = require('ref');
+
+struct = require('ref-struct');
+
+fs = require('fs');
+
+jimp = require('jimp');
+
+bmp_js = require('bmp-js');
+
+IntPtr = ref.refType(ref.types.int);
+
+HANDLE = ref.refType(ref.types["void"]);
+
+lpctstr = {
+    indirection: 1,
+    name: 'lpctstr',
+    size: ref.sizeof.pointer,
+    ffi_type: ffi.types.CString.ffi_type,
+    get: function(buffer, offset) {
+        var _buf;
+        _buf = buffer.readPointer(offset);
+        if (_buf.isNull()) {
+            return null;
+        }
+        return _buf.readCString(0);
+    },
+    set: function(buffer, offset, value) {
+        var _buf;
+        _buf = Buffer.alloc(Buffer.byteLength(value, 'ucs2') + 2);
+        _buf.write(value, 'ucs2');
+        _buf[_buf.length - 2] = 0;
+        _buf[_buf.length - 1] = 0;
+        return buffer.writePointer(_buf, offset);
+    }
 };
 
-var iconInfo = struct({
-	'fIcon': ref.types.bool,
-	'xHotspot': ref.types.ulong,
-	'yHotspot': ref.types.ulong,
-	'hbmMask': HANDLE,
-	'hbmColor': HANDLE
+iconInfo = struct({
+    fIcon: ref.types.bool,
+    xHotspot: ref.types.ulong,
+    yHotspot: ref.types.ulong,
+    hbmMask: HANDLE,
+    hbmColor: HANDLE
 });
 
-var bitmapInfoHeader = struct({
-	biSize: ref.types.ulong,
-	biWidth: ref.types.long,
-	biHeight: ref.types.long,
-	biPlanes: ref.types.ushort,
-	biBitCount: ref.types.ushort,
-	biCompression: ref.types.ulong,
-	biSizeImage: ref.types.ulong,
-	biXPelsPerMeter: ref.types.long,
-	biYPelsPerMeter: ref.types.long,
-	biClrUsed: ref.types.ulong,
-	biClrImportant: ref.types.ulong
+bitmapInfoHeader = struct({
+    biSize: ref.types.ulong,
+    biWidth: ref.types.long,
+    biHeight: ref.types.long,
+    biPlanes: ref.types.ushort,
+    biBitCount: ref.types.ushort,
+    biCompression: ref.types.ulong,
+    biSizeImage: ref.types.ulong,
+    biXPelsPerMeter: ref.types.long,
+    biYPelsPerMeter: ref.types.long,
+    biClrUsed: ref.types.ulong,
+    biClrImportant: ref.types.ulong
 });
 
-var palleteColor = struct({
-	red: ref.types.uint8,
-	greed: ref.types.uint8,
-	blue: ref.types.uint8,
-	void: ref.types.uint8
+palleteColor = struct({
+    red: ref.types.uint8,
+    greed: ref.types.uint8,
+    blue: ref.types.uint8,
+    "void": ref.types.uint8
 });
 
-var bitmapInfo = struct({
-	bmiHeader: bitmapInfoHeader
+bitmapInfo = struct({
+    bmiHeader: bitmapInfoHeader
 });
 
-// Allocate color table for 16 colors
-// The table size is dynamic, but needs to be preallocated
-// After we load the actual table size, we slice unused part off
-for (var i = 0; i < 16; i++) {
-	bitmapInfo.defineProperty('color' + i, palleteColor);
+for (i = j = 0; j < 16; i = ++j) {
+    bitmapInfo.defineProperty('color' + i, palleteColor);
 }
 
-var shell32 = ffi.Library('shell32', {
-	'ExtractAssociatedIconW': ["void *", [IntPtr, lpctstr, IntPtr]]
-});
-var gdi32 = ffi.Library('gdi32', {
-	'GetDIBits': [ref.types.int32, [IntPtr, IntPtr, 'uint32', 'uint32', IntPtr, ref.refType(bitmapInfo), 'uint32'] ]
-});
-var user32 = ffi.Library('user32', {
-	'GetIconInfo': ['bool', [IntPtr, ref.refType(iconInfo)]],
-	'GetDC': [HANDLE, [IntPtr]],
-	'DestroyIcon': ['bool', [HANDLE]]
+shell32 = ffi.Library('shell32', {
+    ExtractAssociatedIconW: ["void *", [IntPtr, lpctstr, IntPtr]]
 });
 
-function loadBitmap(hbitmap, ident) {
-	var bitmap = new bitmapInfo();
-	
-	// Clear bitmap info
-	bitmap['ref.buffer'].fill(0);
+gdi32 = ffi.Library('gdi32', {
+    GetDIBits: [ref.types.int32, [IntPtr, IntPtr, 'uint32', 'uint32', IntPtr, ref.refType(bitmapInfo), 'uint32']]
+});
 
-	// Save the bmiheader size
-	bitmap.bmiHeader.biSize = 40;
+user32 = ffi.Library('user32', {
+    GetIconInfo: ['bool', [IntPtr, ref.refType(iconInfo)]],
+    GetDC: [HANDLE, [IntPtr]],
+    DestroyIcon: ['bool', [HANDLE]]
+});
 
-	// Load bitmap details
-	var dc = user32.GetDC(null);
-	if (dc.deref() == 0) {
-		throw new Error("Failed to get screen DC.");
-	}
-	
-	if (gdi32.GetDIBits(dc, hbitmap, 0, 0, null, bitmap.ref(), 0) == 0) {
-		throw new Error("Failed to load BITMAP (" + ident + ") info.");
-	}
-
-	// Slice off the unused color table
-	var colors = bitmap.bmiHeader.biBitCount < 24 ? ((1 << bitmap.bmiHeader.biBitCount) * 4) : 0;
-	bitmap['ref.buffer'] = bitmap['ref.buffer'].slice(0, bitmap.bmiHeader.biSize + colors);
-
-	// Disable compression
-	bitmap.bmiHeader.biCompression = 0;
-
-	// Load bitmap data
-    var data = Buffer.alloc(bitmap.bmiHeader.biSizeImage);
-	if (gdi32.GetDIBits(dc, hbitmap, 0, bitmap.bmiHeader.biHeight, data, bitmap.ref(), 0) == 0) {
-		throw new Error("Failed to load BITMAP data.");
-	}
-
-	// Prepare BMP header
-    var header = Buffer.alloc(2 + 4 + 4 + 4);
-	
-	// BMP signature (BM)
-	header.writeUInt8(66, 0);
-	header.writeUInt8(77, 1);
-	// Size fo the BMP file, HEADER + COLOR_TABLE + DATA
-	header.writeUInt32LE(data.byteLength + 54 + colors, 2);
-	// Reserved
-	header.writeUInt32LE(0, 6);
-	// Offset of actual image data HEADER + COLOR_TABLE
-	header.writeUInt32LE(54 + colors, 10);
-
-	// Return resulting BMP file
-	return {
-		data: Buffer.concat([header, bitmap.ref(), data]),
-		depth: bitmap.bmiHeader.biBitCount
-	};
-}
+loadBitmap = function(hbitmap, ident) {
+    var bitmap, colors, data, dc, header;
+    bitmap = new bitmapInfo();
+    bitmap['ref.buffer'].fill(0);
+    bitmap.bmiHeader.biSize = 40;
+    dc = user32.GetDC(null);
+    if (dc.deref() === 0) {
+        throw new Error("Failed to get screen DC.");
+    }
+    if (gdi32.GetDIBits(dc, hbitmap, 0, 0, null, bitmap.ref(), 0) === 0) {
+        throw new Error("Failed to load BITMAP (" + ident + ") info.");
+    }
+    colors = bitmap.bmiHeader.biBitCount < 24 && ((1 << bitmap.bmiHeader.biBitCount) * 4) || 0;
+    bitmap['ref.buffer'] = bitmap['ref.buffer'].slice(0, bitmap.bmiHeader.biSize + colors);
+    bitmap.bmiHeader.biCompression = 0;
+    data = Buffer.alloc(bitmap.bmiHeader.biSizeImage);
+    if (gdi32.GetDIBits(dc, hbitmap, 0, bitmap.bmiHeader.biHeight, data, bitmap.ref(), 0) === 0) {
+        throw new Error("Failed to load BITMAP data.");
+    }
+    header = Buffer.alloc(2 + 4 + 4 + 4);
+    header.writeUInt8(66, 0);
+    header.writeUInt8(77, 1);
+    header.writeUInt32LE(data.byteLength + 54 + colors, 2);
+    header.writeUInt32LE(0, 6);
+    header.writeUInt32LE(54 + colors, 10);
+    return {
+        data: Buffer.concat([header, bitmap.ref(), data]),
+        depth: bitmap.bmiHeader.biBitCount
+    };
+};
 
 module.exports = function(target) {
-	return new Promise((resolve, reject) => {
-		// Make sure the path is absolute
-		target = path.resolve(target);
+    return new Promise((function(_this) {
+        return function(resolve, reject) {
+            var colored, colored_bmp, iconIndex, info, mask, mask_bmp, result;
+            target = path.resolve(target);
+            iconIndex = ref.alloc(ref.types.int32, 0);
+            info = new iconInfo();
+            info['ref.buffer'].fill(0);
+            result = shell32.ExtractAssociatedIconW(null, target, iconIndex);
+            if (!user32.GetIconInfo(result, info.ref())) {
+                throw new Error("Failed to load icon info.");
+            }
+            colored = loadBitmap(info.hbmColor, 'colored');
+            mask = loadBitmap(info.hbmMask, 'mask');
+            user32.DestroyIcon(result);
+            colored_bmp = bmp_js.decode(colored.data);
+            mask_bmp = bmp_js.decode(mask.data);
+            return jimp.read(bmp_js.encode(colored_bmp).data, function(err, colored_img) {
+                var has_alpha, index, k, l, ref1, ref2, xx, yy;
+                if (err) {
+                    return reject(err);
+                }
+                has_alpha = false;
+                if (colored.depth > 24) {
+                    for (xx = k = 0, ref1 = colored_bmp.width; 0 <= ref1 ? k < ref1 : k > ref1; xx = 0 <= ref1 ? ++k : --k) {
+                        for (yy = l = 0, ref2 = colored_bmp.height; 0 <= ref2 ? l < ref2 : l > ref2; yy = 0 <= ref2 ? ++l : --l) {
+                            index = colored_img.getPixelIndex(xx, yy);
+                            if (colored_bmp.data[index + 3] !== 0) {
+                                has_alpha = true;
+                                break;
+                            }
+                        }
+                    }
+                }
+                if (has_alpha) {
+                    colored_img.bitmap = colored_bmp;
+                    return colored_img.getBase64(jimp.MIME_PNG, function(error, base64) {
+                        if (err) {
+                            return reject(err);
+                        }
+                        return resolve(base64);
+                    });
+                } else {
+                    return jimp.read(bmp_js.encode(mask_bmp).data, function(err, mask_img) {
+                        var masked_img;
+                        if (err) {
+                            return reject(err);
+                        }
+                        masked_img = colored_img.mask(mask_img.invert(), 0, 0);
+                        return masked_img.getBase64(jimp.MIME_PNG, function(error, base64) {
+                            if (err) {
+                                return reject(err);
+                            }
+                            return resolve(base64);
+                        });
+                    });
+                }
+            });
+        };
+    })(this));
+};
 
-		// Load icon data
-		var iconIndex = ref.alloc(ref.types.int32, 0);
-		var info = new iconInfo();
-		
-		// Clear info struct
-		info['ref.buffer'].fill(0);
-
-		var result = shell32.ExtractAssociatedIconW(null, target, iconIndex);
-		if (!user32.GetIconInfo(result, info.ref())) {
-			throw new Error("Failed to load icon info.");
-		}
-		
-		// Load icon bitmaps
-		var colored = loadBitmap(info.hbmColor, 'colored');
-		var mask = loadBitmap(info.hbmMask, 'mask');
-
-		// Remove icon from memory
-		user32.DestroyIcon(result);
-
-		// Load bitmaps into standardized formats
-		var colored_bmp = bmp_js.decode(colored.data);
-		var mask_bmp = bmp_js.decode(mask.data);
-
-		// Load the colored bmp
-		// Little hack has to be applied, jimp currently doesn't support 32 bit BMP
-		// Encoder uses 24 bit, so it loads fine
-		jimp.read(bmp_js.encode(colored_bmp).data, (err, colored_img) => {
-			if (err) return reject(err);
-
-			// Bitmap can have 32 bits per color, but ignore the aplha channel
-			var has_alpha = false;
-
-			// 32 bit BMP can have alpha encoded, so we may not need the mask
-			if (colored.depth > 24) {			
-				// Scan the original BMP image, if any pixel has > 0 alpha, the mask wont be needed
-				for (var xx = 0; xx < colored_bmp.width; xx++) {
-					for (var yy = 0; yy < colored_bmp.height; yy++) {
-						var index = colored_img.getPixelIndex(xx, yy);
-						if (colored_bmp.data[index + 3] != 0) {
-							has_alpha = true;
-							break;
-						}
-					}
-				}
-			}
-
-			// Ignore mask, if the colored icon has alpha encoded already (most does)
-			if (has_alpha) {
-				// Little hack again, assign actual RGBA data to image
-				colored_img.bitmap = colored_bmp;
-				colored_img.getBase64(jimp.MIME_PNG, (error, base64) => {
-					if (err) return reject(err);
-					
-					resolve(base64);
-				});
-			} else {
-				// Load mask and apply it
-				jimp.read(bmp_js.encode(mask_bmp).data, (err, mask_img) => {
-					if (err) return reject(err);
-					
-					var masked_img = colored_img.mask(mask_img.invert(), 0, 0);
-					masked_img.getBase64(jimp.MIME_PNG, (error, base64) => {
-						if (err) return reject(err);
-						
-						resolve(base64);
-					});
-				});
-			}
-		});
-	});
-}
+//# sourceMappingURL=data:application/json;base64,eyJ2ZXJzaW9uIjozLCJmaWxlIjoiaW5kZXguanMiLCJzb3VyY2VSb290IjoiLiIsInNvdXJjZXMiOlsiIl0sIm5hbWVzIjpbXSwibWFwcGluZ3MiOiI7QUFBQSxJQUFBOztBQUFBLElBQUEsR0FBUyxPQUFBLENBQVEsTUFBUjs7QUFDVCxHQUFBLEdBQVMsT0FBQSxDQUFRLFVBQVI7O0FBQ1QsR0FBQSxHQUFTLE9BQUEsQ0FBUSxLQUFSOztBQUNULE1BQUEsR0FBUyxPQUFBLENBQVEsWUFBUjs7QUFDVCxFQUFBLEdBQVMsT0FBQSxDQUFRLElBQVI7O0FBQ1QsSUFBQSxHQUFTLE9BQUEsQ0FBUSxNQUFSOztBQUNULE1BQUEsR0FBUyxPQUFBLENBQVEsUUFBUjs7QUFFVCxNQUFBLEdBQVMsR0FBRyxDQUFDLE9BQUosQ0FBWSxHQUFHLENBQUMsS0FBSyxDQUFDLEdBQXRCOztBQUNULE1BQUEsR0FBUyxHQUFHLENBQUMsT0FBSixDQUFZLEdBQUcsQ0FBQyxLQUFLLEVBQUMsSUFBRCxFQUFyQjs7QUFFVCxPQUFBLEdBQ0k7SUFBQSxXQUFBLEVBQWdCLENBQWhCO0lBQ0EsSUFBQSxFQUFnQixTQURoQjtJQUVBLElBQUEsRUFBZ0IsR0FBRyxDQUFDLE1BQU0sQ0FBQyxPQUYzQjtJQUdBLFFBQUEsRUFBZ0IsR0FBRyxDQUFDLEtBQUssQ0FBQyxPQUFPLENBQUMsUUFIbEM7SUFJQSxHQUFBLEVBQWdCLFNBQUMsTUFBRCxFQUFTLE1BQVQ7QUFDWixZQUFBO1FBQUEsSUFBQSxHQUFPLE1BQU0sQ0FBQyxXQUFQLENBQW1CLE1BQW5CO1FBQ1AsSUFBZSxJQUFJLENBQUMsTUFBTCxDQUFBLENBQWY7QUFBQSxtQkFBTyxLQUFQOztlQUNBLElBQUksQ0FBQyxXQUFMLENBQWlCLENBQWpCO0lBSFksQ0FKaEI7SUFRQSxHQUFBLEVBQWdCLFNBQUMsTUFBRCxFQUFTLE1BQVQsRUFBaUIsS0FBakI7QUFDWixZQUFBO1FBQUEsSUFBQSxHQUFPLE1BQU0sQ0FBQyxLQUFQLENBQWEsTUFBTSxDQUFDLFVBQVAsQ0FBa0IsS0FBbEIs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O2dCQVVBLElBQUcsU0FBSDtvQkFFSSxXQUFXLENBQUMsTUFBWixHQUFxQjsyQkFDckIsV0FBVyxDQUFDLFNBQVosQ0FBc0IsSUFBSSxDQUFDLFFBQTNCLEVBQXFDLFNBQUMsS0FBRCxFQUFRLE1BQVI7d0JBQ2pDLElBQUksR0FBSjtBQUFjLG1DQUFPLE1BQUEsQ0FBTyxHQUFQLEVBQXJCOzsrQkFDQSxPQUFBLENBQVEsTUFBUjtvQkFGaUMsQ0FBckMsRUFISjtpQkFBQSxNQUFBOzJCQVFJLElBQUksQ0FBQyxJQUFMLENBQVUsTUFBTSxDQUFDLE1BQVAsQ0FBYyxRQUFkLENBQXVCLENBQUMsSUFBbEMsRUFBd0MsU0FBQyxHQUFELEVBQU0sUUFBTjtBQUNwQyw0QkFBQTt3QkFBQSxJQUFJLEdBQUo7QUFBYyxtQ0FBTyxNQUFBLENBQU8sR0FBUCxFQUFyQjs7d0JBRUEsVUFBQSxHQUFhLFdBQVcsQ0FBQyxJQUFaLENBQWlCLFFBQVEsQ0FBQyxNQUFULENBQUEsQ0FBakIsRUFBb0MsQ0FBcEMsRUFBdUMsQ0FBdkM7K0JBQ2IsVUFBVSxDQUFDLFNBQVgsQ0FBcUIsSUFBSSxDQUFDLFFBQTFCLEVBQW9DLFNBQUMsS0FBRCxFQUFRLE1BQVI7NEJBQ2hDLElBQUksR0FBSjtBQUFjLHVDQUFPLE1BQUEsQ0FBTyxHQUFQLEVBQXJCOzttQ0FDQSxPQUFBLENBQVEsTUFBUjt3QkFGZ0MsQ0FBcEM7b0JBSm9DLENBQXhDLEVBUko7O1lBakJ1QyxDQUEzQztRQTlCUTtJQUFBLENBQUEsQ0FBQSxDQUFBLElBQUEsQ0FBWjtBQUZhIiwic291cmNlc0NvbnRlbnQiOlsicGF0aCAgID0gcmVxdWlyZSAncGF0aCdcbmZmaSAgICA9IHJlcXVpcmUgJ2ZmaS1uYXBpJ1xucmVmICAgID0gcmVxdWlyZSAncmVmJ1xuc3RydWN0ID0gcmVxdWlyZSAncmVmLXN0cnVjdCdcbmZzICAgICA9IHJlcXVpcmUgJ2ZzJ1xuamltcCAgID0gcmVxdWlyZSAnamltcCdcbmJtcF9qcyA9IHJlcXVpcmUgJ2JtcC1qcydcblxuSW50UHRyID0gcmVmLnJlZlR5cGUgcmVmLnR5cGVzLmludFxuSEFORExFID0gcmVmLnJlZlR5cGUgcmVmLnR5cGVzLnZvaWRcblxubHBjdHN0ciA9IFxuICAgIGluZGlyZWN0aW9uOiAgICAxXG4gICAgbmFtZTogICAgICAgICAgICdscGN0c3RyJ1xuICAgIHNpemU6ICAgICAgICAgICByZWYuc2l6ZW9mLnBvaW50ZXJcbiAgICBmZmlfdHlwZTogICAgICAgZmZpLnR5cGVzLkNTdHJpbmcuZmZpX3R5cGVcbiAgICBnZXQ6ICAgICAgICAgICAgKGJ1ZmZlciwgb2Zmc2V0KSAtPiBcbiAgICAgICAgX2J1ZiA9IGJ1ZmZlci5yZWFkUG9pbnRlciBvZmZzZXRcbiAgICAgICAgcmV0dXJuIG51bGwgaWYgX2J1Zi5pc051bGwoKVxuICAgICAgICBfYnVmLnJlYWRDU3RyaW5nIDBcbiAgICBzZXQ6ICAgICAgICAgICAgKGJ1ZmZlciwgb2Zmc2V0LCB2YWx1ZSkgLT5cbiAgICAgICAgX2J1ZiA9IEJ1ZmZlci5hbGxvYyBCdWZmZXIuYnl0ZUxlbmd0aCh2YWx1ZSwgJ3VjczInKSsyXG4gICAgICAgIF9idWYud3JpdGUgdmFsdWUsICd1Y3MyJ1xuICAgICAgICBfYnVmW19idWYubGVuZ3RoLTJdID0gMFxuICAgICAgICBfYnVmW19idWYubGVuZ3RoLTFdID0gMFxuICAgICAgICBidWZmZXIud3JpdGVQb2ludGVyIF9idWYsIG9mZnNldFxuXG5pY29uSW5mbyA9IHN0cnVjdCBcbiAgICBmSWNvbjogICAgcmVmLnR5cGVzLmJvb2xcbiAgICB4SG90c3BvdDogcmVmLnR5cGVzLnVsb25nXG4gICAgeUhvdHNwb3Q6IHJlZi50eXBlcy51bG9uZ1xuICAgIGhibU1hc2s6ICBIQU5ETEVcbiAgICBoYm1Db2xvcjogSEFORExFXG5cbmJpdG1hcEluZm9IZWFkZXIgPSBzdHJ1Y3RcbiAgICBiaVNpemU6ICAgICAgICAgIHJlZi50eXBlcy51bG9uZ1xuICAgIGJpV2lkdGg6ICAgICAgICAgcmVmLnR5cGVzLmxvbmdcbiAgICBiaUhlaWdodDogICAgICAgIHJlZi50eXBlcy5sb25nXG4gICAgYmlQbGFuZXM6ICAgICAgICByZWYudHlwZXMudXNob3J0XG4gICAgYmlCaXRDb3VudDogICAgICByZWYudHlwZXMudXNob3J0XG4gICAgYmlDb21wcmVzc2lvbjogICByZWYudHlwZXMudWxvbmdcbiAgICBiaVNpemVJbWFnZTogICAgIHJlZi50eXBlcy51bG9uZ1xuICAgIGJpWFBlbHNQZXJNZXRlcjogcmVmLnR5cGVzLmxvbmdcbiAgICBiaVlQZWxzUGVyTWV0ZXI6IHJlZi50eXBlcy5sb25nXG4gICAgYmlDbHJVc2VkOiAgICAgICByZWYudHlwZXMudWxvbmdcbiAgICBiaUNsckltcG9ydGFudDogIHJlZi50eXBlcy51bG9uZ1xuXG5wYWxsZXRlQ29sb3IgPSBzdHJ1Y3RcbiAgICByZWQ6ICAgcmVmLnR5cGVzLnVpbnQ4XG4gICAgZ3JlZWQ6IHJlZi50eXBlcy51aW50OFxuICAgIGJsdWU6ICByZWYudHlwZXMudWludDhcbiAgICB2b2lkOiAgcmVmLnR5cGVzLnVpbnQ4XG5cbmJpdG1hcEluZm8gPSBzdHJ1Y3QgYm1pSGVhZGVyOmJpdG1hcEluZm9IZWFkZXIgXG5cbiMgQWxsb2NhdGUgY29sb3IgdGFibGUgZm9yIDE2IGNvbG9yc1xuIyBUaGUgdGFibGUgc2l6ZSBpcyBkeW5hbWljLCBidXQgbmVlZHMgdG8gYmUgcHJlYWxsb2NhdGVkXG4jIEFmdGVyIHdlIGxvYWQgdGhlIGFjdHVhbCB0YWJsZSBzaXplLCB3ZSBzbGljZSB1bnVzZWQgcGFydCBvZmZcbmZvciBpIGluIFswLi4uMTZdXG4gICAgYml0bWFwSW5mby5kZWZpbmVQcm9wZXJ0eSAnY29sb3InICsgaSwgcGFsbGV0ZUNvbG9yXG5cbnNoZWxsMzIgPSBmZmkuTGlicmFyeSAnc2hlbGwzMicsIEV4dHJhY3RBc3NvY2lhdGVkSWNvblc6IFtcInZvaWQgKlwiLCBbSW50UHRyLCBscGN0c3RyLCBJbnRQdHJdXVxuXG5nZGkzMiA9IGZmaS5MaWJyYXJ5ICdnZGkzMicsIEdldERJQml0czogW3JlZi50eXBlcy5pbnQzMiwgW0ludFB0ciwgSW50UHRyLCAndWludDMyJywgJ3VpbnQzMicsIEludFB0ciwgcmVmLnJlZlR5cGUoYml0bWFwSW5mbyksICd1aW50MzInXSBdXG5cbnVzZXIzMiA9IGZmaS5MaWJyYXJ5ICd1c2VyMzInLCBcbiAgICBHZXRJY29uSW5mbzogWydib29sJywgW0ludFB0ciwgcmVmLnJlZlR5cGUoaWNvbkluZm8pXV1cbiAgICBHZXREQzogICAgICAgW0hBTkRMRSwgW0ludFB0cl1dXG4gICAgRGVzdHJveUljb246IFsnYm9vbCcsIFtIQU5ETEVdXVxuXG5sb2FkQml0bWFwID0gKGhiaXRtYXAsIGlkZW50KSAtPlxuICAgIGJpdG1hcCA9IG5ldyBiaXRtYXBJbmZvKClcbiAgICBcbiAgICAjIENsZWFyIGJpdG1hcCBpbmZvXG4gICAgYml0bWFwWydyZWYuYnVmZmVyJ10uZmlsbCAwXG5cbiAgICAjIFNhdmUgdGhlIGJtaWhlYWRlciBzaXplXG4gICAgYml0bWFwLmJtaUhlYWRlci5iaVNpemUgPSA0MFxuXG4gICAgIyBMb2FkIGJpdG1hcCBkZXRhaWxzXG4gICAgZGMgPSB1c2VyMzIuR2V0REMgbnVsbFxuICAgIGlmIGRjLmRlcmVmKCkgPT0gMFxuICAgICAgICB0aHJvdyBuZXcgRXJyb3IgXCJGYWlsZWQgdG8gZ2V0IHNjcmVlbiBEQy5cIlxuICAgIFxuICAgIGlmIGdkaTMyLkdldERJQml0cyhkYywgaGJpdG1hcCwgMCwgMCwgbnVsbCwgYml0bWFwLnJlZigpLCAwKSA9PSAwXG4gICAgICAgIHRocm93IG5ldyBFcnJvciBcIkZhaWxlZCB0byBsb2FkIEJJVE1BUCAoXCIgKyBpZGVudCArIFwiKSBpbmZvLlwiXG5cbiAgICAjIFNsaWNlIG9mZiB0aGUgdW51c2VkIGNvbG9yIHRhYmxlXG4gICAgY29sb3JzID0gYml0bWFwLmJtaUhlYWRlci5iaUJpdENvdW50IDwgMjQgYW5kICgoMSA8PCBiaXRtYXAuYm1pSGVhZGVyLmJpQml0Q291bnQpICogNCkgb3IgMFxuICAgIGJpdG1hcFsncmVmLmJ1ZmZlciddID0gYml0bWFwWydyZWYuYnVmZmVyJ10uc2xpY2UgMCwgYml0bWFwLmJtaUhlYWRlci5iaVNpemUgKyBjb2xvcnNcblxuICAgICMgRGlzYWJsZSBjb21wcmVzc2lvblxuICAgIGJpdG1hcC5ibWlIZWFkZXIuYmlDb21wcmVzc2lvbiA9IDBcblxuICAgICMgTG9hZCBiaXRtYXAgZGF0YVxuICAgIGRhdGEgPSBCdWZmZXIuYWxsb2MgYml0bWFwLmJtaUhlYWRlci5iaVNpemVJbWFnZVxuICAgIGlmIGdkaTMyLkdldERJQml0cyhkYywgaGJpdG1hcCwgMCwgYml0bWFwLmJtaUhlYWRlci5iaUhlaWdodCwgZGF0YSwgYml0bWFwLnJlZigpLCAwKSA9PSAwXG4gICAgICAgIHRocm93IG5ldyBFcnJvciBcIkZhaWxlZCB0byBsb2FkIEJJVE1BUCBkYXRhLlwiXG5cbiAgICAjIFByZXBhcmUgQk1QIGhlYWRlclxuICAgIGhlYWRlciA9IEJ1ZmZlci5hbGxvYyAyICsgNCArIDQgKyA0XG4gICAgXG4gICAgIyBCTVAgc2lnbmF0dXJlIChCTSlcbiAgICBoZWFkZXIud3JpdGVVSW50OCA2NiwgMFxuICAgIGhlYWRlci53cml0ZVVJbnQ4IDc3LCAxXG4gICAgIyBTaXplIGZvIHRoZSBCTVAgZmlsZSwgSEVBREVSICsgQ09MT1JfVEFCTEUgKyBEQVRBXG4gICAgaGVhZGVyLndyaXRlVUludDMyTEUgZGF0YS5ieXRlTGVuZ3RoICsgNTQgKyBjb2xvcnMsIDJcbiAgICAjIFJlc2VydmVkXG4gICAgaGVhZGVyLndyaXRlVUludDMyTEUgMCwgNlxuICAgICMgT2Zmc2V0IG9mIGFjdHVhbCBpbWFnZSBkYXRhIEhFQURFUiArIENPTE9SX1RBQkxFXG4gICAgaGVhZGVyLndyaXRlVUludDMyTEUgNTQgKyBjb2xvcnMsIDEwXG5cbiAgICAjIFJldHVybiByZXN1bHRpbmcgQk1QIGZpbGVcbiAgICBkYXRhOiAgQnVmZmVyLmNvbmNhdCBbaGVhZGVyLCBiaXRtYXAucmVmKCksIGRhdGFdXG4gICAgZGVwdGg6IGJpdG1hcC5ibWlIZWFkZXIuYmlCaXRDb3VudFxuXG5tb2R1bGUuZXhwb3J0cyA9ICh0YXJnZXQpIC0+XG4gICAgXG4gICAgbmV3IFByb21pc2UgKHJlc29sdmUsIHJlamVjdCkgPT5cbiAgICAgICAgXG4gICAgICAgICMgTWFrZSBzdXJlIHRoZSBwYXRoIGlzIGFic29sdXRlXG4gICAgICAgIHRhcmdldCA9IHBhdGgucmVzb2x2ZSB0YXJnZXRcblxuICAgICAgICAjIExvYWQgaWNvbiBkYXRhXG4gICAgICAgIGljb25JbmRleCA9IHJlZi5hbGxvYyByZWYudHlwZXMuaW50MzIsIDBcbiAgICAgICAgaW5mbyA9IG5ldyBpY29uSW5mbygpXG4gICAgICAgIFxuICAgICAgICAjIENsZWFyIGluZm8gc3RydWN0XG4gICAgICAgIGluZm9bJ3JlZi5idWZmZXInXS5maWxsIDBcblxuICAgICAgICByZXN1bHQgPSBzaGVsbDMyLkV4dHJhY3RBc3NvY2lhdGVkSWNvblcgbnVsbCwgdGFyZ2V0LCBpY29uSW5kZXhcbiAgICAgICAgaWYgbm90IHVzZXIzMi5HZXRJY29uSW5mbyByZXN1bHQsIGluZm8ucmVmKClcbiAgICAgICAgICAgIHRocm93IG5ldyBFcnJvciBcIkZhaWxlZCB0byBsb2FkIGljb24gaW5mby5cIlxuICAgICAgICBcbiAgICAgICAgIyBMb2FkIGljb24gYml0bWFwc1xuICAgICAgICBjb2xvcmVkID0gbG9hZEJpdG1hcCBpbmZvLmhibUNvbG9yLCAnY29sb3JlZCdcbiAgICAgICAgbWFzayA9IGxvYWRCaXRtYXAgaW5mby5oYm1NYXNrLCAnbWFzaydcblxuICAgICAgICAjIFJlbW92ZSBpY29uIGZyb20gbWVtb3J5XG4gICAgICAgIHVzZXIzMi5EZXN0cm95SWNvbiByZXN1bHRcblxuICAgICAgICAjIExvYWQgYml0bWFwcyBpbnRvIHN0YW5kYXJkaXplZCBmb3JtYXRzXG4gICAgICAgIGNvbG9yZWRfYm1wID0gYm1wX2pzLmRlY29kZSBjb2xvcmVkLmRhdGFcbiAgICAgICAgbWFza19ibXAgPSBibXBfanMuZGVjb2RlIG1hc2suZGF0YVxuXG4gICAgICAgICMgTG9hZCB0aGUgY29sb3JlZCBibXBcbiAgICAgICAgIyBMaXR0bGUgaGFjayBoYXMgdG8gYmUgYXBwbGllZCwgamltcCBjdXJyZW50bHkgZG9lc24ndCBzdXBwb3J0IDMyIGJpdCBCTVBcbiAgICAgICAgIyBFbmNvZGVyIHVzZXMgMjQgYml0LCBzbyBpdCBsb2FkcyBmaW5lXG4gICAgICAgIGppbXAucmVhZCBibXBfanMuZW5jb2RlKGNvbG9yZWRfYm1wKS5kYXRhLCAoZXJyLCBjb2xvcmVkX2ltZykgPT4gXG4gICAgICAgICAgICBpZiAoZXJyKSB0aGVuIHJldHVybiByZWplY3QgZXJyXG5cbiAgICAgICAgICAgICMgQml0bWFwIGNhbiBoYXZlIDMyIGJpdHMgcGVyIGNvbG9yLCBidXQgaWdub3JlIHRoZSBhcGxoYSBjaGFubmVsXG4gICAgICAgICAgICBoYXNfYWxwaGEgPSBmYWxzZVxuXG4gICAgICAgICAgICAjIDMyIGJpdCBCTVAgY2FuIGhhdmUgYWxwaGEgZW5jb2RlZCwgc28gd2UgbWF5IG5vdCBuZWVkIHRoZSBtYXNrXG4gICAgICAgICAgICBpZiBjb2xvcmVkLmRlcHRoID4gMjRcbiAgICAgICAgICAgICAgICAjIFNjYW4gdGhlIG9yaWdpbmFsIEJNUCBpbWFnZSwgaWYgYW55IHBpeGVsIGhhcyA+IDAgYWxwaGEsIHRoZSBtYXNrIHdvbnQgYmUgbmVlZGVkXG4gICAgICAgICAgICAgICAgZm9yIHh4IGluIFswLi4uY29sb3JlZF9ibXAud2lkdGhdIFxuICAgICAgICAgICAgICAgICAgICBmb3IgeXkgaW4gWzAuLi5jb2xvcmVkX2JtcC5oZWlnaHRdIFxuICAgICAgICAgICAgICAgICAgICAgICAgaW5kZXggPSBjb2xvcmVkX2ltZy5nZXRQaXhlbEluZGV4IHh4LCB5eVxuICAgICAgICAgICAgICAgICAgICAgICAgaWYgY29sb3JlZF9ibXAuZGF0YVtpbmRleCArIDNdICE9IDBcbiAgICAgICAgICAgICAgICAgICAgICAgICAgICBoYXNfYWxwaGEgPSB0cnVlXG4gICAgICAgICAgICAgICAgICAgICAgICAgICAgYnJlYWtcblxuICAgICAgICAgICAgIyBJZ25vcmUgbWFzaywgaWYgdGhlIGNvbG9yZWQgaWNvbiBoYXMgYWxwaGEgZW5jb2RlZCBhbHJlYWR5IChtb3N0IGRvZXMpXG4gICAgICAgICAgICBpZiBoYXNfYWxwaGFcbiAgICAgICAgICAgICAgICAjIExpdHRsZSBoYWNrIGFnYWluLCBhc3NpZ24gYWN0dWFsIFJHQkEgZGF0YSB0byBpbWFnZVxuICAgICAgICAgICAgICAgIGNvbG9yZWRfaW1nLmJpdG1hcCA9IGNvbG9yZWRfYm1wXG4gICAgICAgICAgICAgICAgY29sb3JlZF9pbWcuZ2V0QmFzZTY0IGppbXAuTUlNRV9QTkcsIChlcnJvciwgYmFzZTY0KSA9PiBcbiAgICAgICAgICAgICAgICAgICAgaWYgKGVycikgdGhlbiByZXR1cm4gcmVqZWN0IGVyclxuICAgICAgICAgICAgICAgICAgICByZXNvbHZlIGJhc2U2NFxuICAgICAgICAgICAgZWxzZSBcbiAgICAgICAgICAgICAgICAjIExvYWQgbWFzayBhbmQgYXBwbHkgaXRcbiAgICAgICAgICAgICAgICBqaW1wLnJlYWQgYm1wX2pzLmVuY29kZShtYXNrX2JtcCkuZGF0YSwgKGVyciwgbWFza19pbWcpID0+XG4gICAgICAgICAgICAgICAgICAgIGlmIChlcnIpIHRoZW4gcmV0dXJuIHJlamVjdCBlcnJcbiAgICAgICAgICAgICAgICAgICAgIFxuICAgICAgICAgICAgICAgICAgICBtYXNrZWRfaW1nID0gY29sb3JlZF9pbWcubWFzayhtYXNrX2ltZy5pbnZlcnQoKSwgMCwgMClcbiAgICAgICAgICAgICAgICAgICAgbWFza2VkX2ltZy5nZXRCYXNlNjQgamltcC5NSU1FX1BORywgKGVycm9yLCBiYXNlNjQpID0+XG4gICAgICAgICAgICAgICAgICAgICAgICBpZiAoZXJyKSB0aGVuIHJldHVybiByZWplY3QgZXJyXG4gICAgICAgICAgICAgICAgICAgICAgICByZXNvbHZlIGJhc2U2NFxuIl19
+//# sourceURL=index.coffee

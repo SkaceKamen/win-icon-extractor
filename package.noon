@@ -1,0 +1,26 @@
+name            win-icon-extractor
+version         1.1.0
+description     Extracts icon resource from any windows binary or file to base64 PNG string.
+main            index.js
+scripts
+                test  mocha
+os
+                win32
+repository
+                type  git
+                url   https://github.com/SkaceKamen/win-icon-extractor.git
+keywords
+                windows
+                icon extractor
+author          Jan Zipek
+license         MIT
+bugs
+                url  https://github.com/SkaceKamen/win-icon-extractor/issues
+dependencies
+                bmp-js      0.1.0
+                ffi-napi    ^2.4.5
+                jimp        0.6.4
+                ref         git+https://github.com/lxe/ref.git#node-12
+                ref-struct  git+https://github.com/lxe/ref-struct.git#node-12
+devDependencies
+                mocha  ^6.1.4
